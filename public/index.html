@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patient Journey Tracker</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; padding: 2rem; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+  .header h1 { font-size: 22px; font-weight: 600; color: #fff; }
+  .header p { font-size: 13px; color: #64748b; margin-top: 4px; }
+  .live-badge { display: inline-flex; align-items: center; gap: 6px; background: #0d2e1a; color: #4ade80; border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 500; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 2rem; }
+  .stat { background: #1e2130; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #2d3148; }
+  .stat-label { font-size: 12px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 18px; font-weight: 600; color: #fff; }
+  .room { background: #1e2130; border: 1px solid #2d3148; border-radius: 16px; padding: 1.5rem; transition: all 0.4s ease; }
+  .room.active { background: #0d2e1a; border-color: #4ade80; box-shadow: 0 0 0 1px #4ade8040; }
+  .room-icon { font-size: 32px; margin-bottom: 12px; }
+  .room-name { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .room-desc { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+  .patient-badge { display: none; align-items: center; gap: 8px; background: #14532d; color: #4ade80; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 500; }
+  .room.active .patient-badge { display: flex; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+  .arrow { color: #334155; font-size: 24px; display: flex; align-items: center; justify-content: center; padding-top: 2rem; }
+  .rooms-wrapper { display: grid; grid-template-columns: 1fr 24px 1fr 24px 1fr; gap: 8px; align-items: start; }
+  .footer { margin-top: 2rem; text-align: center; font-size: 12px; color: #334155; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Patient Journey Tracker</h1>
+    <p>Surgical Wing &mdash; Real-time location dashboard</p>
+  </div>
+  <div class="live-badge"><span class="live-dot"></span> Live</div>
+</div>
+<div class="stats">
+  <div class="stat"><div class="stat-label">Patient</div><div class="stat-value" id="stat-name">—</div></div>
+  <div class="stat"><div class="stat-label">Current Room</div><div class="stat-value" id="stat-room" style="font-size:14px;padding-top:2px">—</div></div>
+  <div class="stat"><div class="stat-label">Last Updated</div><div class="stat-value" id="stat-time" style="font-size:14px;padding-top:2px">—</div></div>
+</div>
+<div class="rooms-wrapper">
+  <div class="room" id="room-preop">
+    <div class="room-icon">🛏️</div>
+    <div class="room-name">Pre-Op Holding</div>
+    <div class="room-desc">Patient preparation &amp; assessment</div>
+    <div class="patient-badge"><span class="dot"></span> <span id="name-preop">John Doe</span></div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="room" id="room-or">
+    <div class="room-icon">⚕️</div>
+    <div class="room-name">Operating Room 1</div>
+    <div class="room-desc">Active surgical procedure</div>
+    <div class="patient-badge"><span class="dot"></span> <span id="name-or">John Doe</span></div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="room" id="room-recovery">
+    <div class="room-icon">💚</div>
+    <div class="room-name">PACU Recovery</div>
+    <div class="room-desc">Post-surgery monitoring</div>
+    <div class="patient-badge"><span class="dot"></span> <span id="name-recovery">John Doe</span></div>
+  </div>
+</div>
+<div class="footer">Refreshing every 5 seconds &bull; Powered by Firebase Realtime Database</div>
+<script>
+const FIREBASE_URL = "https://patient-tracker-d715a-default-rtdb.europe-west1.firebasedatabase.app/Patients.json";
+const roomMap = { "Pre-Op Holding": "preop", "Operating Room 1": "or", "PACU Recovery": "recovery" };
+function clearRooms() { Object.values(roomMap).forEach(id => document.getElementById("room-"+id).classList.remove("active")); }
+function setRoom(roomName, patientName) {
+  clearRooms();
+  const id = roomMap[roomName];
+  if (id) { document.getElementById("room-"+id).classList.add("active"); document.getElementById("name-"+id).textContent = patientName || "John Doe"; }
+}
+function formatTime(iso) { try { return new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"}); } catch { return "—"; } }
+async function fetchData() {
+  try {
+    const res = await fetch(FIREBASE_URL);
+    const data = await res.json();
+    if (!data) return;
+    document.getElementById("stat-name").textContent = data.Name || data.name || "John Doe";
+    document.getElementById("stat-room").textContent = data.current_room || "Unknown";
+    document.getElementById("stat-time").textContent = formatTime(data.last_updated || "");
+    setRoom(data.current_room, data.Name || data.name);
+  } catch(e) { console.error("Firebase error:", e); }
+}
+fetchData();
+setInterval(fetchData, 5000);
+</script>
+</body>
+</html>
